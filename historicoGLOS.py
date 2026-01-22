@@ -470,8 +470,8 @@ with st.sidebar:
 
     st.markdown("---")
     st.header("Acciones")
-    run_btn = st.button("🔄 Actualizar", use_container_width=True)
-    clear_btn = st.button("🧹 Limpiar", use_container_width=True)
+    run_btn = st.button("🔄 Actualizar", width="stretch")
+    clear_btn = st.button("🧹 Limpiar", width="stretch")
 
 if clear_btn:
     st.session_state.df_all = pd.DataFrame()
@@ -693,11 +693,11 @@ with tab1:
             title=f"Tipificacion por {view_mode}",
             labels={col_estatus: "Tipificacion"},
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
         tbl = make_pct_table(g, group_col, col_estatus, "count")
         tbl = attach_supervisor_to_tipificacion_table(tbl, df_f, group_col)
-        st.dataframe(tbl, use_container_width=True, height=420)
+        st.dataframe(tbl, width="stretch", height=420)
 
         # ✅ Subtificación BELOW Tipificación (same filters)
         st.markdown("### Subtificación correspondiente (ajustada a filtros)")
@@ -714,16 +714,16 @@ with tab1:
                 title=f"Subtificación por {view_mode}",
                 labels={col_result: "Subtificación"},
             )
-            st.plotly_chart(fig2, use_container_width=True)
-            st.dataframe(make_pct_table(g2, group_col, col_result, "count"), use_container_width=True, height=420)
+            st.plotly_chart(fig2, width="stretch")
+            st.dataframe(make_pct_table(g2, group_col, col_result, "count"), width="stretch", height=420)
 
 with tab2:
     st.markdown("### **Agente colgó** (conteo y %), ajustado a filtros")
     g = df_f.groupby(group_col, as_index=False).agg(total=("Hangup_Flag", "size"), colgo=("Hangup_Flag", "sum"))
     g["pct_colgo"] = (g["colgo"] / g["total"].replace(0, 1) * 100).round(2)
     fig = px.bar(g, x=group_col, y="pct_colgo", title=f"% Agente colgó por {view_mode}")
-    st.plotly_chart(fig, use_container_width=True)
-    st.dataframe(g.sort_values("pct_colgo", ascending=False), use_container_width=True, height=420)
+    st.plotly_chart(fig, width="stretch")
+    st.dataframe(g.sort_values("pct_colgo", ascending=False), width="stretch", height=420)
 
     # ✅ Subtificación of ONLY hung-up calls
     st.markdown("### Subtificación de **llamadas colgadas** (ajustada a filtros)")
@@ -744,19 +744,42 @@ with tab2:
                 title=f"Subtificación (solo colgadas) por {view_mode}",
                 labels={col_result: "Subtificación"},
             )
-            st.plotly_chart(fig_h, use_container_width=True)
-            st.dataframe(make_pct_table(g_h, group_col, col_result, "count"), use_container_width=True, height=420)
+            st.plotly_chart(fig_h, width="stretch")
+            st.dataframe(make_pct_table(g_h, group_col, col_result, "count"), width="stretch", height=420)
 
 with tab3:
+    # ✅ ONLY CHANGE: Detalle + Excel shows/exports ONLY these columns (in this order)
+    detail_specs = [
+        ("Campaña_CC", ["Campaña_CC", "Campana_CC", "Campana"]),
+        ("Fecha_CC", ["Fecha_CC"]),
+        ("Tel_Marcado_CC", ["Tel_Marcado_CC", "tel", "telefono", "Telefono", "Telefono_CC"]),
+        ("duracion(seg)_CC", ["duracion(seg)_CC", "Duracion_CC", "Duracion_Seg_CC", "duracion_cc"]),
+        ("Duracion_Min_CC", ["Duracion_Min_CC", "Duración_Min_CC"]),
+        ("Estatus_CC", ["Estatus_CC", "Estatus"]),
+        ("Codigo_Resultado_CC", ["Codigo_Resultado_CC", "Calificacion_CC", "Calificacion", "Calificacion_Int_CC", "Clave_int_cli"]),
+        ("Codigo_Resultado_Ajustado", ["Codigo_Resultado_Ajustado"]),
+        ("Fecha_CC", ["Fecha_CC", "Fecha", "fecha", "fecha_cc"]),
+        ("Obs_CC", ["Obs_CC", "OBS_CC", "Observaciones", "Observacion"]),
+        ("Colgo_Agente_CC", ["Colgo_Agente_CC", "Colgo Agente CC", "Colgo_Agente"]),
+    ]
+
+    df_detalle = pd.DataFrame(index=df_f.index)
+    for out_name, cands in detail_specs:
+        col_found = first_existing_col(df_f, cands)
+        if col_found and col_found in df_f.columns:
+            df_detalle[out_name] = df_f[col_found]
+        else:
+            df_detalle[out_name] = pd.NA
+
     st.markdown("### Detalle filtrado")
-    st.dataframe(df_f, use_container_width=True, height=520)
+    st.dataframe(df_detalle, width="stretch", height=520)
 
     # ✅ ON-DEMAND Excel to avoid Streamlit Cloud crashes
     c1, c2 = st.columns([1, 1])
     with c1:
-        prepare_excel = st.button("📦 Preparar Excel (on-demand)", use_container_width=True)
+        prepare_excel = st.button("📦 Preparar Excel (on-demand)", width="stretch")
     with c2:
-        clear_excel = st.button("🧹 Limpiar Excel preparado", use_container_width=True)
+        clear_excel = st.button("🧹 Limpiar Excel preparado", width="stretch")
 
     if clear_excel:
         st.session_state.excel_bytes = None
@@ -767,7 +790,7 @@ with tab3:
         if len(df_f) > 60000:
             st.warning("Hay muchos registros. Si tarda o falla, reduce el rango/filters antes de exportar.")
         with st.spinner("Generando Excel..."):
-            st.session_state.excel_bytes = to_excel_bytes(df_f, sheet_name="detalle_filtrado", max_autofit_rows=200)
+            st.session_state.excel_bytes = to_excel_bytes(df_detalle, sheet_name="detalle_filtrado", max_autofit_rows=200)
         st.success("Excel listo ✅")
 
     if st.session_state.excel_bytes:
@@ -776,7 +799,7 @@ with tab3:
             data=st.session_state.excel_bytes,
             file_name="bonsaif_m27_GLOS_detalle_filtrado.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True,
+            width="stretch",
         )
     else:
         st.info("Para evitar crashes, el Excel se genera **solo** cuando presionas **Preparar Excel**.")
