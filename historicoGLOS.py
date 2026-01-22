@@ -584,7 +584,7 @@ with st.sidebar:
     selected_agents = st.multiselect("Agente (uno o varios)", agent_opts, default=agent_opts)
 
     estatus_opts = sorted(df[col_estatus].dropna().astype(str).unique().tolist()) if col_estatus else []
-    selected_estatus = st.multiselect("Estatus (uno o varios)", estatus_opts, default=estatus_opts)
+    selected_estatus = st.multiselect("Tipificacion (uno o varios)", estatus_opts, default=estatus_opts)
 
     # Dependent options for Código Resultado
     pre_filters = {}
@@ -599,7 +599,7 @@ with st.sidebar:
     df_for_results = apply_filters(df, pre_filters)
     result_opts = sorted(df_for_results[col_result].dropna().astype(str).unique().tolist()) if col_result else []
     selected_results = st.multiselect(
-        "Calificación (Código Resultado) — depende del Estatus",
+        "Subtificación (Código Resultado) — depende de la Tipificacion",
         result_opts,
         default=result_opts,
     )
@@ -642,8 +642,8 @@ st.subheader("📊 KPIs (con filtros actuales)")
 k1, k2, k3, k4 = st.columns(4)
 
 k1.metric("Llamadas", f"{len(df_f):,}")
-k2.metric("Estatus únicos", f"{df_f[col_estatus].nunique():,}" if col_estatus else "-")
-k3.metric("Códigos resultado únicos", f"{df_f[col_result].nunique():,}" if col_result else "-")
+k2.metric("Tipificaciones únicas", f"{df_f[col_estatus].nunique():,}" if col_estatus else "-")
+k3.metric("Subtificaciones únicas", f"{df_f[col_result].nunique():,}" if col_result else "-")
 hang_rate = (df_f["Hangup_Flag"].mean() * 100) if len(df_f) else 0
 k4.metric("Agente colgó (%)", f"{hang_rate:,.2f}%")
 
@@ -668,14 +668,14 @@ if st.session_state.excel_key != excel_key:
 # ----------------------------------------------------
 # TABS
 # ----------------------------------------------------
-tab1, tab2, tab3, tab4 = st.tabs(
-    ["Tipificación (Estatus)", "Calificación (Código Resultado)", "Agente colgó", "Detalle + Excel"]
+tab1, tab2, tab3 = st.tabs(
+    ["Tipificacion", "Agente colgó", "Detalle + Excel"]
 )
 
 with tab1:
-    st.markdown("### Tipificación por **Estatus** (ajustada a filtros)")
+    st.markdown("### Análisis por **Tipificacion** (ajustada a filtros)")
     if not col_estatus:
-        st.info("No existe la columna Estatus_CC en estos datos.")
+        st.info("No existe la columna Estatus_CC (Tipificacion) en estos datos.")
     else:
         g = df_f.groupby([group_col, col_estatus], as_index=False).size().rename(columns={"size": "count"})
         fig = px.bar(
@@ -684,7 +684,8 @@ with tab1:
             y="count",
             color=col_estatus,
             barmode="stack",
-            title=f"Estatus por {view_mode}",
+            title=f"Tipificacion por {view_mode}",
+            labels={col_estatus: "Tipificacion"},
         )
         st.plotly_chart(fig, use_container_width=True)
 
@@ -692,24 +693,25 @@ with tab1:
         tbl = attach_supervisor_to_tipificacion_table(tbl, df_f, group_col)
         st.dataframe(tbl, use_container_width=True, height=420)
 
-with tab2:
-    st.markdown("### Análisis por **Código Resultado** (Calificación) ")
-    if not col_result:
-        st.info("No existe la columna Codigo_Resultado_CC en estos datos.")
-    else:
-        g = df_f.groupby([group_col, col_result], as_index=False).size().rename(columns={"size": "count"})
-        fig = px.bar(
-            g,
-            x=group_col,
-            y="count",
-            color=col_result,
-            barmode="stack",
-            title=f"Código Resultado por {view_mode}",
-        )
-        st.plotly_chart(fig, use_container_width=True)
-        st.dataframe(make_pct_table(g, group_col, col_result, "count"), use_container_width=True, height=420)
+        # ✅ Subtificación BELOW Tipificación (same filters)
+        st.markdown("### Subtificación correspondiente (ajustada a filtros)")
+        if not col_result:
+            st.info("No existe la columna Codigo_Resultado_CC (Subtificación) en estos datos.")
+        else:
+            g2 = df_f.groupby([group_col, col_result], as_index=False).size().rename(columns={"size": "count"})
+            fig2 = px.bar(
+                g2,
+                x=group_col,
+                y="count",
+                color=col_result,
+                barmode="stack",
+                title=f"Subtificación por {view_mode}",
+                labels={col_result: "Subtificación"},
+            )
+            st.plotly_chart(fig2, use_container_width=True)
+            st.dataframe(make_pct_table(g2, group_col, col_result, "count"), use_container_width=True, height=420)
 
-with tab3:
+with tab2:
     st.markdown("### **Agente colgó** (conteo y %), ajustado a filtros")
     g = df_f.groupby(group_col, as_index=False).agg(total=("Hangup_Flag", "size"), colgo=("Hangup_Flag", "sum"))
     g["pct_colgo"] = (g["colgo"] / g["total"].replace(0, 1) * 100).round(2)
@@ -717,7 +719,29 @@ with tab3:
     st.plotly_chart(fig, use_container_width=True)
     st.dataframe(g.sort_values("pct_colgo", ascending=False), use_container_width=True, height=420)
 
-with tab4:
+    # ✅ Subtificación of ONLY hung-up calls
+    st.markdown("### Subtificación de **llamadas colgadas** (ajustada a filtros)")
+    if not col_result:
+        st.info("No existe la columna Codigo_Resultado_CC (Subtificación) en estos datos.")
+    else:
+        df_h = df_f[df_f["Hangup_Flag"] == True]
+        if df_h.empty:
+            st.info("No hay llamadas colgadas con los filtros actuales.")
+        else:
+            g_h = df_h.groupby([group_col, col_result], as_index=False).size().rename(columns={"size": "count"})
+            fig_h = px.bar(
+                g_h,
+                x=group_col,
+                y="count",
+                color=col_result,
+                barmode="stack",
+                title=f"Subtificación (solo colgadas) por {view_mode}",
+                labels={col_result: "Subtificación"},
+            )
+            st.plotly_chart(fig_h, use_container_width=True)
+            st.dataframe(make_pct_table(g_h, group_col, col_result, "count"), use_container_width=True, height=420)
+
+with tab3:
     st.markdown("### Detalle filtrado")
     st.dataframe(df_f, use_container_width=True, height=520)
 
