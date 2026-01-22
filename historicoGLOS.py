@@ -567,6 +567,12 @@ df, col_result = add_adeudo_tratable(df, col_result_raw, col_obs, threshold=1500
 if not col_result:
     col_result = col_result_raw
 
+# ✅ SAME "Sin Tipificacion" RULE FOR GLOS (so filters + plots show it, not blank)
+if col_estatus and col_estatus in df.columns:
+    df[col_estatus] = _clean_text_to_na(df[col_estatus]).fillna("Sin Tipificacion").astype(str)
+if col_result and col_result in df.columns:
+    df[col_result] = _clean_text_to_na(df[col_result]).fillna("Sin Tipificacion").astype(str)
+
 # ----------------------------------------------------
 # FILTERS
 # ----------------------------------------------------
