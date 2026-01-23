@@ -144,6 +144,11 @@ def to_excel_bytes(df: pd.DataFrame, sheet_name="m27", max_autofit_rows: int = 2
         cell.font = header_font
         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
 
+    # ✅ ENABLE EXCEL FILTER DROPDOWNS ON HEADER ROW (AutoFilter)
+    if ws.max_row >= 1 and ws.max_column >= 1:
+        last_col_letter = get_column_letter(ws.max_column)
+        ws.auto_filter.ref = f"A1:{last_col_letter}{ws.max_row}"
+
     # ✅ Auto-fit using a SAMPLE (header + first N rows)
     sample_last_row = min(ws.max_row, 1 + max_autofit_rows)  # row 1 is header
     for col_idx in range(1, ws.max_column + 1):
@@ -674,9 +679,7 @@ if st.session_state.excel_key != excel_key:
 # ----------------------------------------------------
 # TABS
 # ----------------------------------------------------
-tab1, tab2, tab3 = st.tabs(
-    ["Tipificacion", "Agente colgó", "Detalle + Excel"]
-)
+tab1, tab2, tab3 = st.tabs(["Tipificacion", "Agente colgó", "Detalle + Excel"])
 
 with tab1:
     st.markdown("### Análisis por **Tipificacion** (ajustada a filtros)")
@@ -699,7 +702,6 @@ with tab1:
         tbl = attach_supervisor_to_tipificacion_table(tbl, df_f, group_col)
         st.dataframe(tbl, width="stretch", height=420)
 
-        # ✅ Subtificación BELOW Tipificación (same filters)
         st.markdown("### Subtificación correspondiente (ajustada a filtros)")
         if not col_result:
             st.info("No existe la columna Codigo_Resultado_CC (Subtificación) en estos datos.")
@@ -725,7 +727,6 @@ with tab2:
     st.plotly_chart(fig, width="stretch")
     st.dataframe(g.sort_values("pct_colgo", ascending=False), width="stretch", height=420)
 
-    # ✅ Subtificación of ONLY hung-up calls
     st.markdown("### Subtificación de **llamadas colgadas** (ajustada a filtros)")
     if not col_result:
         st.info("No existe la columna Codigo_Resultado_CC (Subtificación) en estos datos.")
@@ -748,7 +749,7 @@ with tab2:
             st.dataframe(make_pct_table(g_h, group_col, col_result, "count"), width="stretch", height=420)
 
 with tab3:
-    # ✅ ONLY CHANGE: Detalle + Excel shows/exports ONLY these columns (in this order)
+    # ✅ ONLY CHANGE you asked earlier is already here; leaving as-is
     detail_specs = [
         ("Campaña_CC", ["Campaña_CC", "Campana_CC", "Campana"]),
         ("Fecha_CC", ["Fecha_CC"]),
@@ -774,7 +775,6 @@ with tab3:
     st.markdown("### Detalle filtrado")
     st.dataframe(df_detalle, width="stretch", height=520)
 
-    # ✅ ON-DEMAND Excel to avoid Streamlit Cloud crashes
     c1, c2 = st.columns([1, 1])
     with c1:
         prepare_excel = st.button("📦 Preparar Excel (on-demand)", width="stretch")
